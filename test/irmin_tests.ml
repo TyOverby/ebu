@@ -148,12 +148,12 @@ module Custom_data = struct
 
     let merge =
       let open Irmin.Merge in
-      Irmin.Merge.option @@
-      like
-        t
-        (pair string string)
-        (fun { kind; content } -> kind, content)
-        (fun (kind, content) -> { kind; content })
+      Irmin.Merge.option
+      @@ like
+           t
+           (pair string string)
+           (fun { kind; content } -> kind, content)
+           (fun (kind, content) -> { kind; content })
     ;;
   end
 end
