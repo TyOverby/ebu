@@ -1,0 +1,6 @@
+(library
+ (name ebu_test)
+ (inline_tests)
+ (libraries core_kernel irmin irmin-mem async lwt.unix)
+ (preprocess
+  (pps ppx_jane)))
