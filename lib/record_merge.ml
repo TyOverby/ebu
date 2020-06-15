@@ -7,13 +7,20 @@ module type Datatype_s = sig
   val merge : t Irmin.Merge.t
 end
 
+module Ct = struct
+  type 'a t =
+    { lca : 'a option
+    ; left : 'a
+    ; right : 'a
+    }
+  [@@deriving sexp]
+end
+
 module Make (Datatype : Datatype_s) = struct
   module Conflict_tripple = struct
-    type t =
-      { lca : Datatype.t option
-      ; left : Datatype.t
-      ; right : Datatype.t
-      }
+    open Ct
+
+    type nonrec t = Datatype.t t
 
     let t =
       Irmin.Type.map
@@ -25,14 +32,19 @@ module Make (Datatype : Datatype_s) = struct
     let compare = Irmin.Type.compare t
   end
 
+  module Conflict_map = Stdlib.Map.Make (Conflict_tripple)
+  module Conflict_set = Stdlib.Set.Make (Conflict_tripple)
+
   module Conflict = struct
     include Irmin.Merge.Set (Conflict_tripple)
-    module S = Stdlib.Set.Make (Conflict_tripple)
 
-    type t = S.t
+    type t = Conflict_set.t
 
     let t =
-      Irmin.Type.map (Irmin.Type.list Conflict_tripple.t) S.of_list S.elements
+      Irmin.Type.map
+        (Irmin.Type.list Conflict_tripple.t)
+        Conflict_set.of_list
+        Conflict_set.elements
     ;;
 
     let merge = Irmin.Merge.option merge
@@ -40,9 +52,8 @@ module Make (Datatype : Datatype_s) = struct
 
   module Resolution = struct
     include Irmin.Merge.Map (Conflict_tripple)
-    module M = Stdlib.Map.Make (Conflict_tripple)
 
-    type t = Datatype.t M.t
+    type t = Datatype.t Conflict_map.t
 
     let merge =
       Irmin.Merge.option
@@ -52,8 +63,8 @@ module Make (Datatype : Datatype_s) = struct
     let t =
       Irmin.Type.map
         (Irmin.Type.list (Irmin.Type.pair Conflict_tripple.t Datatype.t))
-        (fun l -> l |> Stdlib.List.to_seq |> M.of_seq)
-        M.bindings
+        (fun l -> l |> Stdlib.List.to_seq |> Conflict_map.of_seq)
+        Conflict_map.bindings
     ;;
   end
 
@@ -85,11 +96,11 @@ module Make (Datatype : Datatype_s) = struct
             (function
               | Some (`Contents (contents, metadata)) ->
                 return_some_contents
-                @@ (Conflict.S.add tripple contents, metadata)
+                @@ (Conflict_set.add tripple contents, metadata)
               | Some _ -> assert false
               | None ->
                 return_some_contents
-                @@ (Conflict.S.singleton tripple, C.Metadata.default))
+                @@ (Conflict_set.singleton tripple, C.Metadata.default))
         in
         Lwt.return (Error error)
       ;;
@@ -113,10 +124,10 @@ module Make (Datatype : Datatype_s) = struct
                 let right_hashed = Irmin.Type.short_hash Datatype.t right in
                 [ sprintf "%d-%d-%d" lca_hashed left_hashed right_hashed ]
               in
-              let tripple = { Conflict_tripple.lca; left; right } in
+              let tripple = { Ct.lca; left; right } in
               let* resolutions = R.find resolutions path in
               (match
-                 resolutions |> Option.bind ~f:(Resolution.M.find_opt tripple)
+                 resolutions |> Option.bind ~f:(Conflict_map.find_opt tripple)
                with
               | Some resolution -> Lwt.return (Ok resolution)
               | None ->
