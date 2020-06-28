@@ -1,0 +1,35 @@
+.leaf {
+ margin: 0.2em;
+ padding-right:0;
+ padding-left:0.5em;
+ margin-bottom:3px;
+ border:0px solid red;
+}
+
+.leaf.current {
+ border-left-color: teal;
+ background:rgb(252,235,187);
+}
+
+.leaf {
+  border-left: 3px solid black;
+  border-radius:3px;
+}
+
+.leaf.hd {
+ border:none; 
+ border-radius:0;
+}
+
+.branch{
+  border-left: 3px solid black;
+  border-radius:3px;
+}
+
+.branch.selected {
+ border-left-color: crimson;
+}
+
+.children{
+ padding-left:1em;
+}

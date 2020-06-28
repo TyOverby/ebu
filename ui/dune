@@ -1,0 +1,10 @@
+(executable
+ (name ebu_ui)
+ (modes js)
+ (libraries core_kernel bonsai bonsai.web)
+ (preprocess
+  (pps ppx_jane js_of_ocaml-ppx)))
+
+(alias
+ (name default)
+ (deps index.html style.css))
