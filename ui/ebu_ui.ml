@@ -8,7 +8,7 @@ let root = Bonsai.Value.return root
 
 let textbox ~onkey =
   Vdom.Node.textarea
-    [ Vdom.Attr.on_keypress (fun evt ->
+    [ Vdom.Attr.on_keydown (fun evt ->
           onkey
             (Js_of_ocaml.Js.Optdef.to_option
                (Js_of_ocaml.Js.Optdef.map evt##.key Js_of_ocaml.Js.to_string)))

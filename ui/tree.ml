@@ -37,7 +37,7 @@ module For_testing = struct
     let e_id = Id.create () in
     let string_leaf s = Leaf { kind = "text/plain"; content = s } in
     let many =
-      List.init 1000 ~f:(fun i ->
+      List.init 10 ~f:(fun i ->
           let id = Id.create () in
           id, string_leaf (sprintf "%d" i))
     in
