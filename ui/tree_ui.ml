@@ -2,43 +2,51 @@ open! Core_kernel
 open! Bonsai_web.Future
 open Bonsai.Let_syntax
 
-let tree, root = Tree.For_testing.demo
+module Selected = struct
+  module Model = struct
+    type t =
+      { selected : int list
+      ; history : int list list
+      }
+    [@@deriving sexp, equal]
 
-(*
-let tree_var = Bonsai.Var.create tree
-let tree = Bonsai.Var.value tree_var
-*)
+    let default = { selected = [ -1 ]; history = [] }
+  end
 
-let root_var = Bonsai.Var.create root
-let root = Bonsai.Var.value root_var
-let history_var = Bonsai.Var.create []
-let history = Bonsai.Var.value history_var
-let selected_var = Bonsai.Var.create [ -1 ]
-let selected = Bonsai.Var.value selected_var
-let set_selected = unstage (Effect.of_sync_fun (Bonsai.Var.set selected_var))
+  module Action = struct
+    type t =
+      | Set of int list
+      | Clear
+      | Push of int list
+      | Pop of (bool -> Ui_event.t)
 
-let push_history =
-  unstage
-    (Effect.of_sync_fun (fun h ->
-         Bonsai.Var.update history_var ~f:(fun p -> h :: p)))
-;;
+    let sexp_of_t = function
+      | Set il -> Sexp.List [ Sexp.Atom "set"; [%sexp_of: int list] il ]
+      | Push il -> Sexp.List [ Sexp.Atom "push"; [%sexp_of: int list] il ]
+      | Pop _ -> Sexp.Atom "pop"
+      | Clear -> Sexp.Atom "clear"
+    ;;
+  end
+end
 
-let pop_history =
-  unstage
-    (Effect.of_sync_fun (fun () ->
-         let did_pop = ref true in
-         Bonsai.Var.update history_var ~f:(function
-             | [] ->
-               did_pop := false;
-               []
-             | hd :: rest ->
-               Bonsai.Var.set selected_var hd;
-               rest);
-         !did_pop))
-;;
-
-let clear_history =
-  unstage (Effect.of_sync_fun (fun () -> Bonsai.Var.set history_var []))
+let selected_f =
+  Bonsai.state_machine0
+    [%here]
+    (module Selected.Model)
+    (module Selected.Action)
+    ~default_model:Selected.Model.default
+    ~apply_action:(fun ~inject:_ ~schedule_event model -> function
+      | Set selected -> { model with selected }
+      | Push il -> { model with history = il :: model.history }
+      | Clear -> { model with history = [] }
+      | Pop inject_did_pop ->
+        let new_model, did_pop =
+          match model.history with
+          | [] -> model, false
+          | hd :: rest -> { selected = hd; history = rest }, true
+        in
+        schedule_event (inject_did_pop did_pop);
+        new_model)
 ;;
 
 let textbox ~onkey =
@@ -167,7 +175,7 @@ let draw_branch { Tree.hd; tl } render { Common.tree; path; _ } acc selected =
   view, acc
 ;;
 
-let render ~tree =
+let render ~tree ~root ~selected =
   let rec render common =
     let node = Map.find_exn common.Common.tree common.Common.node_id in
     match node with
@@ -177,24 +185,23 @@ let render ~tree =
   return
   @@ let%map tree = tree
      and root = root
-     and selected = selected in
+     and { Selected.Model.selected; _ }, _ = selected in
      render
        { Common.is_hd = false; tree; node_id = root; path = [] }
        Path.empty
        selected
 ;;
 
-let main ~tree =
+let main ~tree ~root =
+  let%sub selected = selected_f in
   let%sub debug = debug ~tree in
-  let%sub input = input in
-  let%sub rendered = render ~tree in
+  let%sub rendered = render ~tree ~root ~selected in
   return
-  @@ let%map debug = debug
-     and input = input
+  @@ let%map _debug = debug
      and rendered = rendered
-     and selected = selected in
+     and { Selected.Model.selected; _ }, inject_selection = selected in
      let rendered_view, paths = rendered in
-     let paths_view =
+     let _paths_view =
        paths
        |> Map.keys
        |> List.map ~f:(fun path ->
@@ -206,57 +213,48 @@ let main ~tree =
               |> Vdom.Node.li [])
        |> Vdom.Node.ul []
      in
-     let input =
-       input (fun key ->
-           let open Effect.Let_syntax in
-           match key with
-           | "h" ->
-             let parent =
-               match List.rev selected with
-               | [] -> [ -1 ]
-               | -1 :: _ :: rest | _ :: rest -> -1 :: rest
-             in
-             let parent = List.rev parent in
-             (match Map.closest_key paths `Less_or_equal_to parent with
-             | Some (path, ()) ->
-               Effect.inject_ignoring_response
-               @@ let%map () = set_selected path
-                  and () = push_history selected in
-                  ()
-             | None -> Vdom.Event.Ignore)
-           | "l" ->
-             Effect.inject_ignoring_response
-             @@ let%bind did_pop = pop_history () in
-                if did_pop
-                then return ()
-                else (
-                  let child =
-                    match List.rev selected with
-                    | -1 :: rest -> 0 :: rest
-                    | _ -> []
-                    (* This seems like a weird default *)
-                  in
-                  let child = List.rev child in
-                  match Map.find paths child with
-                  | Some () -> set_selected child
-                  | None -> return ())
-           | "k" ->
-             (match Map.closest_key paths `Less_than selected with
-             | Some (path, ()) ->
-               Effect.inject_ignoring_response
-               @@ let%map () = set_selected path
-                  and () = clear_history () in
-                  ()
-             | None -> Vdom.Event.Ignore)
-           | "j" ->
-             (match Map.closest_key paths `Greater_than selected with
-             | Some (path, ()) ->
-               Effect.inject_ignoring_response
-               @@ let%map () = set_selected path
-                  and () = clear_history () in
-                  ()
-             | None -> Vdom.Event.Ignore)
-           | _ -> Vdom.Event.Ignore)
+     let on_key key =
+       match key with
+       | "h" ->
+         let parent =
+           match List.rev selected with
+           | [] -> [ -1 ]
+           | -1 :: _ :: rest | _ :: rest -> -1 :: rest
+         in
+         let parent = List.rev parent in
+         (match Map.closest_key paths `Less_or_equal_to parent with
+         | Some (path, ()) ->
+           Ui_event.Many
+             [ inject_selection (Set path); inject_selection (Push selected) ]
+         | None -> Ui_event.Ignore)
+       | "l" ->
+         inject_selection
+           (Pop
+              (function
+              | true -> Ui_event.Ignore
+              | false ->
+                let child =
+                  match List.rev selected with
+                  | -1 :: rest -> 0 :: rest
+                  | _ -> []
+                  (* This seems like a weird default *)
+                in
+                let child = List.rev child in
+                (match Map.find paths child with
+                | Some () -> inject_selection (Set child)
+                | None -> Ui_event.Ignore)))
+       | "k" ->
+         (match Map.closest_key paths `Less_than selected with
+         | Some (path, ()) ->
+           Ui_event.Many [ inject_selection (Set path); inject_selection Clear ]
+         | None -> Vdom.Event.Ignore)
+       | "j" ->
+         (match Map.closest_key paths `Greater_than selected with
+         | Some (path, ()) ->
+           Ui_event.Many [ inject_selection (Set path); inject_selection Clear ]
+         | None -> Vdom.Event.Ignore)
+       | _ -> Vdom.Event.Ignore
      in
-     Vdom.Node.div [] [ debug; rendered_view; paths_view; input ]
+     let view = Vdom.Node.div [] [ rendered_view ] in
+     view, on_key
 ;;
