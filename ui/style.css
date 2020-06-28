@@ -1,18 +1,18 @@
 .leaf {
- margin: 0.2em;
+ margin:0;
  padding-right:0;
- padding-left:0.5em;
+ padding-left:5px;
  margin-bottom:3px;
  border:0px solid red;
 }
 
 .leaf.current {
- border-left-color: teal;
- background:rgb(252,235,187);
+ border-left-color: rgba(150, 0, 0, 0.5);
+ background:rgba(252,235,187, 0.5);
 }
 
 .leaf {
-  border-left: 3px solid black;
+  border-left: 4px solid rgba(0, 0, 0, 0.5);
   border-radius:3px;
 }
 
@@ -22,12 +22,12 @@
 }
 
 .branch{
-  border-left: 3px solid black;
+  border-left: 4px solid rgba(0, 0, 0, 0.5);
   border-radius:3px;
 }
 
 .branch.selected {
- border-left-color: crimson;
+ border-left-color: rgba(150, 0, 0, 0.5);
 }
 
 .children{

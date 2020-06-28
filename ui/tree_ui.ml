@@ -115,8 +115,8 @@ module Common = struct
 end
 
 let draw_leaf
-    { Tree.kind; content }
-    { Common.is_hd; node_id; path; _ }
+    { Tree.kind = _; content }
+    { Common.is_hd; node_id = _; path; _ }
     acc
     selected
   =
@@ -129,15 +129,16 @@ let draw_leaf
   let view =
     Vdom.Node.div
       [ Vdom.Attr.classes classes ]
-      [ Vdom.Node.div
-          []
-          [ Vdom.Node.textf
-              "leaf %s %s %s"
-              kind
-              (Tree.Id.to_string node_id)
-              (Sexp.to_string_hum [%message (path : int list)])
-          ]
-      ; Vdom.Node.text content
+      [ (*_ Vdom.Node.div
+              []
+              [ Vdom.Node.textf
+                  "leaf %s %s %s"
+                  kind
+                  (Tree.Id.to_string node_id)
+                  (Sexp.to_string_hum [%message (path : int list)])
+              ]
+          ; *)
+        Vdom.Node.text content
       ]
   in
   view, Path.add acc path
