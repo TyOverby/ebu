@@ -1,6 +1,7 @@
 open! Core_kernel
 open! Bonsai_web.Future
 open Bonsai.Let_syntax
+module M2 = Intersection_observer
 
 let tree, root = Tree.For_testing.demo
 let tree = Bonsai.Value.return tree
