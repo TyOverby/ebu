@@ -86,7 +86,9 @@ module Make (Datatype : Datatype_s) = struct
 
       let all_attempts_at_negotiation_have_failed ~error ~path ~tripple =
         let open Lwt.Syntax in
-        let return_some_contents a = Lwt.return (Some (`Contents a)) in
+        let return_some_contents a =
+          Lwt.return (Some (C.Tree.v (`Contents a)))
+        in
         let* (_ : (unit, C.write_error) Result.t) =
           C.with_tree
             ~info:Irmin.Info.none
@@ -94,10 +96,12 @@ module Make (Datatype : Datatype_s) = struct
             conflicts
             path
             (function
-              | Some (`Contents (contents, metadata)) ->
-                return_some_contents
-                @@ (Conflict_set.add tripple contents, metadata)
-              | Some _ -> assert false
+              | Some tree ->
+                (match C.Tree.destruct tree with
+                | `Contents (contents, metadata) ->
+                  return_some_contents
+                  @@ (Conflict_set.add tripple contents, metadata)
+                | _ -> assert false)
               | None ->
                 return_some_contents
                 @@ (Conflict_set.singleton tripple, C.Metadata.default))
