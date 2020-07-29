@@ -53,9 +53,12 @@ let tree =
       (module Tree_t)
       ~root
       ~extra
-      ~render:(fun data ~is_selected:_ ~children ->
+      ~render:(fun data ~is_selected ~children ->
+        let%sub state = Bonsai.state [%here] (module Int) ~default_model:0 in
         return
         @@ let%map { kind; content } = data
+           and state, set_state = state
+           and is_selected = is_selected
            and children = children in
            let kids =
              children
@@ -66,14 +69,18 @@ let tree =
            let me =
              Vdom.Node.div
                [ Vdom.Attr.class_ "leaf" ]
-               [ Vdom.Node.textf "%s: %s" kind content ]
+               [ Vdom.Node.textf "%s: %s %d" kind content state
+               ; Vdom.Node.button
+                   [ Vdom.Attr.on_click (fun _ -> set_state (state + 1)) ]
+                   [ Vdom.Node.text "+1" ]
+               ]
            in
-           let attrs =
-             if Map.is_empty children
-             then [ Vdom.Attr.class_ "leaf" ]
-             else [ Vdom.Attr.class_ "branch" ]
+           let leaf_or_branch =
+             if Map.is_empty children then "leaf" else "branch"
            in
-           Vdom.Node.div attrs [ me; kids ])
+           let selected = if is_selected then [ "selected" ] else [] in
+           let attrs = Vdom.Attr.classes (leaf_or_branch :: selected) in
+           Vdom.Node.div [ attrs ] [ me; kids ])
   in
   return
   @@ let%map r, _ = r in
