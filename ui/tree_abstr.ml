@@ -11,19 +11,22 @@ module type Tree = sig
 
   type data
   type t
+  type extra
 
-  val stuff : t -> data
-  val children : t -> (Cmp.t, t, Cmp.comparator_witness) Map.t
+  val stuff : extra -> t -> data
+  val children : extra -> t -> (Cmp.t, t, Cmp.comparator_witness) Map.t
 end
 
 let component
-    (type t key data cmp)
+    (type t key data cmp extra)
     (module T : Tree
       with type Cmp.t = key
        and type data = data
        and type Cmp.comparator_witness = cmp
+       and type extra = extra
        and type t = t)
     ~(root : T.t Bonsai.Value.t)
+    ~(extra : T.extra Bonsai.Value.t)
     ~render
   =
   let key_compare a b = T.Cmp.comparator.Comparator.compare a b in
@@ -59,8 +62,16 @@ let component
     in
     let is_selected = Bonsai.Value.map selection_value ~f:Tuple2.get1 in
     let could_be_selected = Bonsai.Value.map selection_value ~f:Tuple2.get2 in
-    let stuff = node >>| T.stuff in
-    let children = node >>| T.children in
+    let stuff =
+      let%map node = node
+      and extra = extra in
+      T.stuff extra node
+    in
+    let children =
+      let%map node = node
+      and extra = extra in
+      T.children extra node
+    in
     let f key data =
       let new_path = Bonsai.Value.map2 key path ~f:List.cons in
       Bonsai.laze
@@ -78,7 +89,11 @@ let component
       let path = Bonsai.Value.map2 key path ~f:List.cons in
       Bonsai.laze (lazy (paths_helper ~node:data ~path))
     in
-    let children = node >>| T.children in
+    let children =
+      let%map node = node
+      and extra = extra in
+      T.children extra node
+    in
     let%sub children_paths = Bonsai.assoc (module T.Cmp) children ~f in
     return
     @@ let%map children_paths = children_paths

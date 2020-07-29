@@ -7,4 +7,4 @@
 
 (alias
  (name default)
- (deps index.html style.css))
+ (deps index.html ebu_ui.bc.js style.css))

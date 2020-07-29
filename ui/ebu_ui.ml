@@ -2,6 +2,30 @@ open! Core_kernel
 open! Bonsai_web.Future
 open Bonsai.Let_syntax
 module M2 = Intersection_observer
+module T = Tree_abstr
+
+module Tree_t = struct
+  module Cmp = Tree.Id
+
+  type data = Tree.leaf
+  type t = Tree.t
+  type extra = Tree.Store.t
+
+  let rec stuff extra = function
+    | Tree.Leaf leaf -> leaf
+    | Tree.Branch { hd; _ } -> Map.find_exn extra hd |> stuff extra
+  ;;
+
+  let children extra = function
+    | Tree.Leaf _ -> Map.empty (module Tree.Id)
+    | Tree.Branch { tl; _ } ->
+      tl
+      |> List.map ~f:(fun k -> k, Map.find_exn extra k)
+      |> Tree.Id.Map.of_alist_exn
+  ;;
+end
+
+module F : Tree_abstr.Tree = Tree_t 
 
 let tree, root = Tree.For_testing.demo
 let tree = Bonsai.Value.return tree
