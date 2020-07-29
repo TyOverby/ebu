@@ -25,7 +25,7 @@ module Tree_t = struct
   ;;
 end
 
-module F : Tree_abstr.Tree = Tree_t 
+module F : Tree_abstr.Tree = Tree_t
 
 let tree, root = Tree.For_testing.demo
 let tree = Bonsai.Value.return tree
@@ -41,6 +41,46 @@ let textbox ~onkey =
     []
 ;;
 
+let tree =
+  let extra = tree in
+  let root =
+    let%map root = root
+    and tree = tree in
+    Map.find_exn tree root
+  in
+  let%sub r =
+    Tree_abstr.component
+      (module Tree_t)
+      ~root
+      ~extra
+      ~render:(fun data ~is_selected:_ ~children ->
+        return
+        @@ let%map { kind; content } = data
+           and children = children in
+           let kids =
+             children
+             |> Map.data
+             |> List.map ~f:Tuple2.get1
+             |> Vdom.Node.div [ Vdom.Attr.class_ "children" ]
+           in
+           let me =
+             Vdom.Node.div
+               [ Vdom.Attr.class_ "leaf" ]
+               [ Vdom.Node.textf "%s: %s" kind content ]
+           in
+           let attrs =
+             if Map.is_empty children
+             then [ Vdom.Attr.class_ "leaf" ]
+             else [ Vdom.Attr.class_ "branch" ]
+           in
+           Vdom.Node.div attrs [ me; kids ])
+  in
+  return
+  @@ let%map r, _ = r in
+     r
+;;
+
+(*
 let input =
   let%sub text_state =
     Bonsai.state
@@ -73,14 +113,14 @@ let main =
   @@ let%map input = input
      and main, on_key = tree in
      Vdom.Node.div [] [ input on_key; main ]
-;;
+;; *)
 
 let () =
   let _handle =
     Start.start
       Start.Result_spec.just_the_view
       ~bind_to_element_with_id:"app"
-      main
+      tree
   in
   ()
 ;;

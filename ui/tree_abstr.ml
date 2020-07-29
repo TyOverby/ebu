@@ -46,7 +46,9 @@ let component
     let%sub selection_value =
       Bonsai.match_option
         could_be_selected
-        ~none:(Bonsai.const (false, None))
+        ~none:
+          (let%sub a = Bonsai.const (false, None) in
+           return a)
         ~some:(fun selected_path ->
           return
           @@ let%map selected_path = selected_path
@@ -104,7 +106,7 @@ let component
          ~f:(fun ~key:_ ~data acc ->
            match Map.append ~lower_part:acc ~upper_part:data with
            | `Ok map -> map
-           | `Overlapping_key_ranges -> assert false)
+           | `Overlapping_key_ranges -> failwith "no")
   in
   let%sub _paths = paths_helper ~node:root ~path:(Bonsai.Value.return []) in
   let%sub rendered =
